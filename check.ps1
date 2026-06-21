@@ -396,7 +396,8 @@ try {
     $hnOut     = netsh wlan show hostednetwork
     $hnStatus  = $hnOut | Select-String "Status\s+:\s+(.+)"
     if ($hnStatus -and $hnStatus.Matches.Groups[1].Value.Trim() -eq "Started") {
-        $hnSSID = ($hnOut | Select-String 'SSID name\s+:\s+"(.+)"')?.Matches.Groups[1].Value
+        $hnSSIDMatch = $hnOut | Select-String 'SSID name\s+:\s+"(.+)"'
+    $hnSSID = if ($hnSSIDMatch) { $hnSSIDMatch.Matches.Groups[1].Value } else { "Unknown" }
         Write-Host "  WARNING: Hosted Network ACTIVE! SSID: $hnSSID" -ForegroundColor Red
         $suspAct += "Hosted network active: $hnSSID"
     } else {
