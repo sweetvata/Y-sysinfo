@@ -118,7 +118,14 @@ foreach ($svc in $services) {
     if ($service) {
         $dn = $svc.DisplayName
         if ($dn.Length -gt 40) { $dn = $dn.Substring(0, 37) + "..." }
-        if ($service.Status -eq "Running") {
+        # icssvc (Mobile Hotspot): Stopped = хорошо (зелёный), Running = плохо (красный)
+        if ($svc.Name -eq "icssvc") {
+            if ($service.Status -eq "Running") {
+                Write-Host ("  {0,-12} {1,-42} {2}" -f $svc.Name, $dn, $service.Status) -ForegroundColor Red
+            } else {
+                Write-Host ("  {0,-12} {1,-42} {2}" -f $svc.Name, $dn, $service.Status) -ForegroundColor Green
+            }
+        } elseif ($service.Status -eq "Running") {
             Write-Host ("  {0,-12} {1,-42}" -f $svc.Name, $dn) -ForegroundColor Green -NoNewline
             if ($svc.Name -eq "Bam") {
                 Write-Host " | Enabled" -ForegroundColor White
