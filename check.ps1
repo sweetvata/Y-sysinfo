@@ -321,8 +321,8 @@ if ($sfcSum) {
 
 # JAVA PROCESSES
 Write-Pink "`nJAVA PROCESSES"
-$jProcs = Get-Process -Name "java" -ErrorAction SilentlyContinue
-if (-not $jProcs) { Write-Host "  No java.exe running" -ForegroundColor Green }
+$jProcs = Get-Process -Name @("java","javaw") -ErrorAction SilentlyContinue
+if (-not $jProcs) { Write-Host "  No java/javaw processes running" -ForegroundColor Green }
 else {
     Write-Host "  Total java processes: $($jProcs.Count)" -ForegroundColor White
     $nsLines = netstat -ano | Select-String "LISTENING|ESTABLISHED"
