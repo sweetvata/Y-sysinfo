@@ -16,6 +16,12 @@ Write-Host "Y-sysinfo" -ForegroundColor Cyan
 Write-Host ""
 
 # ============================================================
+# SFC — запускаем в фоне сразу, результат покажем в конце
+# ============================================================
+Write-Host "Starting sfc /scannow in background..." -ForegroundColor Gray
+$sfcJob = Start-Job -ScriptBlock { sfc /scannow 2>&1 }
+
+# ============================================================
 # UPTIME
 # ============================================================
 try {
@@ -438,12 +444,13 @@ try {
 } catch {}
 
 # ============================================================
-# SFC SCANNOW
+# SFC SCANNOW — результат (запускался в начале в фоне)
 # ============================================================
 Write-Host "`nSFC SCANNOW" -ForegroundColor Cyan
-Write-Host "  Running... (may take a few minutes)" -ForegroundColor Yellow
-$sfcResult = sfc /scannow 2>&1
-# Показываем только итоговую строку — без прогресса
+Write-Host "  Waiting for sfc to finish..." -ForegroundColor Yellow
+Wait-Job $sfcJob | Out-Null
+$sfcResult = Receive-Job $sfcJob
+Remove-Job $sfcJob
 $sfcSummary = $sfcResult | Where-Object { $_ -match "protection|found|repair|did not find|resource" } | Select-Object -Last 1
 if ($sfcSummary) {
     $color = if ($sfcSummary -match "did not find") { "Green" } else { "Yellow" }
