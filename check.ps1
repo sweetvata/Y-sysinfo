@@ -344,13 +344,7 @@ else {
     }
 }
 
-# FINDSTR FINDER
-Write-Pink "`nFINDSTR"
-$ns25 = netstat -ano | Select-String ":25565"
-if ($ns25) {
-    Write-Host "  Port 25565 ACTIVE:" -ForegroundColor Red
-    $ns25 | ForEach-Object { Write-Host "    $($_.Line.Trim())" -ForegroundColor Red }
-} else { Write-Host "  Port 25565: Not in use" -ForegroundColor Green }
+
 
 # SUMMARY
 Write-Host "`n============================================================" -ForegroundColor DarkGray
