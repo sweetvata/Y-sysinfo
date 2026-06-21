@@ -417,7 +417,7 @@ try {
             try {
                 $gw = (Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -and $_.DefaultIPGateway }).DefaultIPGateway | Select-Object -First 1
                 if ($gw) {
-                    if ($gw -like "192.168.137.*") { $isHs = $true; $fakerDetected = $true; $fakerIndicators += "Windows PC Hotspot gateway (192.168.137.x)"; $hsIndicators += "Gateway = Windows Mobile Hotspot â€” FAKER INDICATOR" }
+                    if ($gw -like "192.168.137.*") { $isHs = $true; $fakerDetected = $true; $fakerIndicators += "Windows PC Hotspot gateway (192.168.137.x)"; $hsIndicators += "Gateway = Windows Mobile Hotspot - FAKER INDICATOR" }
                     elseif ($gw -eq "192.168.43.1") { $isHs = $true; $hsIndicators += "Gateway = Android hotspot (192.168.43.1)" }
                     elseif ($gw -eq "192.168.49.1") { $isHs = $true; $hsIndicators += "Gateway = Android hotspot (192.168.49.1)" }
                 }
@@ -489,7 +489,7 @@ if ($sfcSummary) {
 # ============================================================
 # JAVA PORTS (Minecraft Ð¸ Ð´Ñ€ÑƒÐ³Ð¸Ðµ java-Ð¿Ñ€Ð¾Ñ†ÐµÑÑÑ‹)
 # ============================================================
-Write-Pink "`nJAVA PROCESSES & PORTS"
+Write-Pink "`nJAVA PROCESSES AND PORTS"
 
 $javaProcs = Get-Process -Name "java" -ErrorAction SilentlyContinue
 if (-not $javaProcs) {
@@ -501,7 +501,7 @@ if (-not $javaProcs) {
     $netstatLines = netstat -ano | Select-String "LISTENING|ESTABLISHED"
 
     foreach ($jp in $javaProcs) {
-        Write-Host "`n  PID $($jp.Id) â€” $($jp.ProcessName)" -ForegroundColor White
+        Write-Host "`n  PID $($jp.Id) - $($jp.ProcessName)" -ForegroundColor White
         Write-Host "    Started : $($jp.StartTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
 
         # ÐšÐ¾Ð¼Ð°Ð½Ð´Ð½Ð°Ñ ÑÑ‚Ñ€Ð¾ÐºÐ° Ð¿Ñ€Ð¾Ñ†ÐµÑÑÐ° (Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ jar/Ð°Ñ€Ð³ÑƒÐ¼ÐµÐ½Ñ‚Ñ‹)
@@ -551,4 +551,5 @@ if ($fakerIndicators.Count -gt 0) {
 
 Write-Host "`nCheck complete. Hit up @praiselily if u run into any issues." -ForegroundColor DarkGray
 Write-Host ""
+
 
