@@ -12,13 +12,31 @@ if (-not $isAdmin) {
     exit
 }
 
-# нежно розовый через ANSI (работает в Windows 10+)
-$pink = "`e[38;2;255;182;193m"
-$reset = "`e[0m"
+# нежно розовый через ANSI (включаем поддержку для текущей консоли)
+$null = [System.Console]::OutputEncoding
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class ConsoleHelper {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr GetStdHandle(int nStdHandle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+}
+"@
+$handle = [ConsoleHelper]::GetStdHandle(-11)
+$mode = 0
+[ConsoleHelper]::GetConsoleMode($handle, [ref]$mode) | Out-Null
+[ConsoleHelper]::SetConsoleMode($handle, $mode -bor 4) | Out-Null
+
+$pink  = [char]27 + "[38;2;255;182;193m"
+$reset = [char]27 + "[0m"
 
 function Write-Pink {
     param([string]$Text)
-    Write-Host "$pink$Text$reset"
+    Write-Host "${pink}${Text}${reset}"
 }
 
 Write-Pink "Y-sysinfo"
