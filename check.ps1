@@ -1,4 +1,4 @@
-﻿$isAdmin = [System.Security.Principal.WindowsPrincipal]::new(
+$isAdmin = [System.Security.Principal.WindowsPrincipal]::new(
     [System.Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 
