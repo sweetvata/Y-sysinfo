@@ -12,7 +12,16 @@ if (-not $isAdmin) {
     exit
 }
 
-Write-Host "Y-sysinfo" -ForegroundColor Cyan
+# нежно розовый через ANSI (работает в Windows 10+)
+$pink = "`e[38;2;255;182;193m"
+$reset = "`e[0m"
+
+function Write-Pink {
+    param([string]$Text)
+    Write-Host "$pink$Text$reset"
+}
+
+Write-Pink "Y-sysinfo"
 Write-Host ""
 
 # ============================================================
@@ -27,7 +36,7 @@ $sfcJob = Start-Job -ScriptBlock { sfc /scannow 2>&1 }
 try {
     $bootTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
     $uptime = (Get-Date) - $bootTime
-    Write-Host "SYSTEM BOOT TIME" -ForegroundColor Cyan
+    Write-Pink "SYSTEM BOOT TIME"
     Write-Host ("  Last Boot: {0}" -f $bootTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
     Write-Host ("  Uptime: {0} days, {1:D2}:{2:D2}:{3:D2}" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds) -ForegroundColor White
 } catch {
@@ -37,7 +46,7 @@ try {
 # ============================================================
 # ДАТА УСТАНОВКИ WINDOWS
 # ============================================================
-Write-Host "`nWINDOWS INSTALLATION" -ForegroundColor Cyan
+Write-Pink "`nWINDOWS INSTALLATION"
 try {
     $installDateRaw = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").InstallDate
     if ($installDateRaw) {
@@ -59,7 +68,7 @@ try {
 # ============================================================
 $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -ne 5 }
 if ($drives) {
-    Write-Host "`nCONNECTED DRIVES" -ForegroundColor Cyan
+    Write-Pink "`nCONNECTED DRIVES"
     foreach ($drive in $drives) {
         Write-Host ("  {0}: {1}" -f $drive.DeviceID, $drive.FileSystem) -ForegroundColor Green
     }
@@ -68,7 +77,7 @@ if ($drives) {
 # ============================================================
 # СЛУЖБЫ
 # ============================================================
-Write-Host "`nSERVICE STATUS" -ForegroundColor Cyan
+Write-Pink "`nSERVICE STATUS"
 
 $services = @(
     @{Name = "SysMain";    DisplayName = "SysMain"},
@@ -116,7 +125,7 @@ foreach ($svc in $services) {
 # ============================================================
 # РЕЕСТР
 # ============================================================
-Write-Host "`nREGISTRY" -ForegroundColor Cyan
+Write-Pink "`nREGISTRY"
 
 $settings = @(
     @{ Name = "CMD";                Path = "HKCU:\Software\Policies\Microsoft\Windows\System";                               Key = "DisableCMD";               Warning = "Disabled"; Safe = "Available" },
@@ -140,7 +149,7 @@ foreach ($s in $settings) {
 # ============================================================
 # EVENT LOGS
 # ============================================================
-Write-Host "`nEVENT LOGS" -ForegroundColor Cyan
+Write-Pink "`nEVENT LOGS"
 
 function Check-EventLog {
     param ($logName, $eventID, $message)
@@ -186,7 +195,7 @@ try {
 # ============================================================
 # USN JOURNAL
 # ============================================================
-Write-Host "`nUSN JOURNAL" -ForegroundColor Cyan
+Write-Pink "`nUSN JOURNAL"
 try {
     $usnOutput = fsutil usn queryjournal C: 2>&1
     if ($usnOutput -match "Invalid" -or $usnOutput -match "не удалось") {
@@ -220,7 +229,7 @@ try {
 # ============================================================
 $prefetchPath = "$env:SystemRoot\Prefetch"
 if (Test-Path $prefetchPath) {
-    Write-Host "`nPREFETCH INTEGRITY" -ForegroundColor Cyan
+    Write-Pink "`nPREFETCH INTEGRITY"
 
     $files = Get-ChildItem -Path $prefetchPath -Filter *.pf -Force -ErrorAction SilentlyContinue
     if (-not $files) {
@@ -279,7 +288,7 @@ if (Test-Path $prefetchPath) {
 # ============================================================
 # КОРЗИНА
 # ============================================================
-Write-Host "`nRECYCLE BIN" -ForegroundColor Cyan
+Write-Pink "`nRECYCLE BIN"
 try {
     $rbPath = "$env:SystemDrive\`$Recycle.Bin"
     if (Test-Path $rbPath) {
@@ -316,7 +325,7 @@ try {
 # ============================================================
 # ИСТОРИЯ POWERSHELL
 # ============================================================
-Write-Host "`nPOWERSHELL HISTORY" -ForegroundColor Cyan
+Write-Pink "`nPOWERSHELL HISTORY"
 $histPath = "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt"
 if (Test-Path $histPath) {
     $hf = Get-Item -Path $histPath -Force
@@ -332,7 +341,7 @@ if (Test-Path $histPath) {
 # ============================================================
 # HOTSPOT / FAKER DETECTION
 # ============================================================
-Write-Host "`nHOTSPOT / FAKER DETECTION" -ForegroundColor Cyan
+Write-Pink "`nHOTSPOT / FAKER DETECTION"
 
 $suspAct       = @()
 $fakerDetected = $false
@@ -446,7 +455,7 @@ try {
 # ============================================================
 # SFC SCANNOW — результат (запускался в начале в фоне)
 # ============================================================
-Write-Host "`nSFC SCANNOW" -ForegroundColor Cyan
+Write-Pink "`nSFC SCANNOW"
 Write-Host "  Waiting for sfc to finish..." -ForegroundColor Yellow
 Wait-Job $sfcJob | Out-Null
 $sfcResult = Receive-Job $sfcJob
@@ -462,7 +471,7 @@ if ($sfcSummary) {
 # ============================================================
 # JAVA PORTS (Minecraft и другие java-процессы)
 # ============================================================
-Write-Host "`nJAVA PROCESSES & PORTS" -ForegroundColor Cyan
+Write-Pink "`nJAVA PROCESSES & PORTS"
 
 $javaProcs = Get-Process -Name "java" -ErrorAction SilentlyContinue
 if (-not $javaProcs) {
@@ -489,7 +498,7 @@ if (-not $javaProcs) {
         # Порты этого PID
         $pidPorts = $netstatLines | Where-Object { $_ -match "\s+$($jp.Id)\s*$" }
         if ($pidPorts) {
-            Write-Host "    Ports   :" -ForegroundColor Cyan
+            Write-Pink "    Ports   :"
             foreach ($line in $pidPorts) {
                 $line = $line.Line.Trim()
                 # Подсветить Minecraft-порты
@@ -505,9 +514,9 @@ if (-not $javaProcs) {
 # ============================================================
 # ИТОГ
 # ============================================================
-Write-Host "`n============================================================" -ForegroundColor Cyan
-Write-Host "  SUMMARY" -ForegroundColor Cyan
-Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "`n============================================================" -ForegroundColor DarkGray
+Write-Pink "  SUMMARY"
+Write-Host "============================================================" -ForegroundColor DarkGray
 Write-Host "  Suspicious activities : $($suspAct.Count)" -ForegroundColor $(if ($suspAct.Count -gt 0) { "Red" } else { "Green" })
 Write-Host "  Faker detected        : $(if ($fakerDetected) { 'YES' } else { 'No' })" -ForegroundColor $(if ($fakerDetected) { "Red" } else { "Green" })
 Write-Host "  Hotspot profiles      : $(($networkProfiles | Where-Object { $_.IsHotspot }).Count)" -ForegroundColor White
@@ -522,5 +531,5 @@ if ($fakerIndicators.Count -gt 0) {
     foreach ($fi in $fakerIndicators) { Write-Host "    - $fi" -ForegroundColor Yellow }
 }
 
-Write-Host "`nCheck complete. Hit up @praiselily if u run into any issues." -ForegroundColor Cyan
+Write-Host "`nCheck complete. Hit up @praiselily if u run into any issues." -ForegroundColor DarkGray
 Write-Host ""
