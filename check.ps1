@@ -339,16 +339,18 @@ else {
         $pp = $nsLines | Where-Object { $_ -match "\s+$($jp.Id)\s*$" }
         if ($pp) {
             Write-Host "    Ports:" -ForegroundColor White
-            $pp | ForEach-Object { $l=$_.Line.Trim(); $c=if ($l -match ":25565") {"Red"} else {"White"}; Write-Host "      $l" -ForegroundColor $c }
+            $pp | ForEach-Object { Write-Host "      $($_.Line.Trim())" -ForegroundColor White }
         } else { Write-Host "    Ports: none found" -ForegroundColor Gray }
     }
 }
 
-# PORT 25565
-Write-Pink "`nPORT 25565 (Minecraft)"
+# FINDSTR FINDER
+Write-Pink "`nFINDSTR"
 $ns25 = netstat -ano | Select-String ":25565"
-if ($ns25) { Write-Host "  Port 25565 ACTIVE:" -ForegroundColor Red; $ns25 | ForEach-Object { Write-Host "    $($_.Line.Trim())" -ForegroundColor White } }
-else { Write-Host "  Port 25565: Not in use" -ForegroundColor Green }
+if ($ns25) {
+    Write-Host "  Port 25565 ACTIVE:" -ForegroundColor Red
+    $ns25 | ForEach-Object { Write-Host "    $($_.Line.Trim())" -ForegroundColor Red }
+} else { Write-Host "  Port 25565: Not in use" -ForegroundColor Green }
 
 # SUMMARY
 Write-Host "`n============================================================" -ForegroundColor DarkGray
