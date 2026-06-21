@@ -12,7 +12,7 @@ if (-not $isAdmin) {
     exit
 }
 
-Write-Host "made with love by lily<3" -ForegroundColor Cyan
+Write-Host "Y-sysinfo" -ForegroundColor Cyan
 Write-Host ""
 
 # ============================================================
@@ -162,7 +162,6 @@ function Check-RecentEventLog {
 Check-EventLog      "Application"  3079          "USN Journal cleared"
 Check-RecentEventLog "System"      @(104, 1102)  "Event Logs cleared"
 Check-EventLog      "System"       1074          "Last PC Shutdown"
-Check-EventLog      "Security"     4616          "System time changed"
 Check-EventLog      "System"       6005          "Event Log Service started"
 
 # Device changed
@@ -184,19 +183,30 @@ try {
 Write-Host "`nUSN JOURNAL" -ForegroundColor Cyan
 try {
     $usnOutput = fsutil usn queryjournal C: 2>&1
-    if ($usnOutput -match "Invalid") {
-        Write-Host "  USN Journal: DISABLED on C:" -ForegroundColor Red
+    if ($usnOutput -match "Invalid" -or $usnOutput -match "не удалось") {
+        Write-Host "  Status       : DISABLED (журнал отсутствует)" -ForegroundColor Red
     } elseif ($usnOutput -match "Usn Journal ID") {
-        Write-Host "  USN Journal: ENABLED on C:" -ForegroundColor Green
-        $usnOutput | Select-String "Journal ID|First Usn|Next Usn|Minimum Size|Maximum Size|Allocation" | ForEach-Object {
-            Write-Host ("    {0}" -f $_.Line.Trim()) -ForegroundColor White
+        Write-Host "  Status       : Enabled" -ForegroundColor Green
+
+        # Последняя ручная очистка — Event ID 3079 в Application log
+        $usnClear = Get-WinEvent -LogName "Application" -FilterXPath "*[System[EventID=3079]]" -MaxEvents 1 -ErrorAction SilentlyContinue
+        if ($usnClear) {
+            Write-Host "  Last cleared : $($usnClear.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Red
+        } else {
+            Write-Host "  Last cleared : No records found (never cleared manually)" -ForegroundColor Green
+        }
+
+        # First USN — косвенный признак сброса журнала (большое значение = не сбрасывался)
+        $firstUsn = $usnOutput | Select-String "First Usn"
+        if ($firstUsn) {
+            $usnVal = $firstUsn.Line.Trim()
+            Write-Host "  $usnVal" -ForegroundColor Gray
         }
     } else {
-        Write-Host "  USN Journal: Unknown state" -ForegroundColor Yellow
-        $usnOutput | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+        Write-Host "  Status       : Unknown" -ForegroundColor Yellow
     }
 } catch {
-    Write-Host "  USN Journal: Error reading" -ForegroundColor Red
+    Write-Host "  Error reading USN Journal" -ForegroundColor Red
 }
 
 # ============================================================
@@ -431,9 +441,16 @@ try {
 # SFC SCANNOW
 # ============================================================
 Write-Host "`nSFC SCANNOW" -ForegroundColor Cyan
-Write-Host "  Running sfc /scannow (may take a few minutes)..." -ForegroundColor Yellow
+Write-Host "  Running... (may take a few minutes)" -ForegroundColor Yellow
 $sfcResult = sfc /scannow 2>&1
-$sfcResult | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
+# Показываем только итоговую строку — без прогресса
+$sfcSummary = $sfcResult | Where-Object { $_ -match "protection|found|repair|did not find|resource" } | Select-Object -Last 1
+if ($sfcSummary) {
+    $color = if ($sfcSummary -match "did not find") { "Green" } else { "Yellow" }
+    Write-Host "  Result: $($sfcSummary.ToString().Trim())" -ForegroundColor $color
+} else {
+    Write-Host "  Result: completed (check CBS.log for details)" -ForegroundColor White
+}
 
 # ============================================================
 # JAVA PORTS (Minecraft и другие java-процессы)
