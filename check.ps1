@@ -1,8 +1,4 @@
-$isAdmin = [System.Security.Principal.WindowsPrincipal]::new(
-    [System.Security.Principal.WindowsIdentity]::GetCurrent()
-).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if (-not $isAdmin) {
+f (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "[ERROR] Run as Administrator!" -ForegroundColor Red
     exit
 }
@@ -15,11 +11,13 @@ public class ConsoleHelper {
     [DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr h, out uint m);
     [DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr h, uint m);
 }
-"@
-$handle = [ConsoleHelper]::GetStdHandle(-11)
-$mode = 0
-[ConsoleHelper]::GetConsoleMode($handle, [ref]$mode) | Out-Null
-[ConsoleHelper]::SetConsoleMode($handle, $mode -bor 4) | Out-Null
+"@ -ErrorAction SilentlyContinue
+try {
+    $handle = [ConsoleHelper]::GetStdHandle(-11)
+    $mode = 0
+    [ConsoleHelper]::GetConsoleMode($handle, [ref]$mode) | Out-Null
+    [ConsoleHelper]::SetConsoleMode($handle, $mode -bor 4) | Out-Null
+} catch {}
 $pink  = [char]27 + "[38;2;255;182;193m"
 $reset = [char]27 + "[0m"
 function Write-Pink { param([string]$Text); Write-Host "${pink}${Text}${reset}" }
@@ -107,10 +105,10 @@ foreach ($svc in $services) {
 # REGISTRY
 Write-Pink "`nREGISTRY"
 $regs = @(
-    @{Name="CMD";               Path="HKCU:\Software\Policies\Microsoft\Windows\System";                                              Key="DisableCMD";               W="Disabled"; S="Available"},
-    @{Name="PS Logging";        Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";                       Key="EnableScriptBlockLogging"; W="Disabled"; S="Enabled"},
-    @{Name="Activities Cache";  Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System";                                              Key="EnableActivityFeed";       W="Disabled"; S="Enabled"},
-    @{Name="Prefetch";          Path="HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters";   Key="EnablePrefetcher";         W="Disabled"; S="Enabled"}
+    @{Name="CMD";              Path="HKCU:\Software\Policies\Microsoft\Windows\System";                                                                Key="DisableCMD";               W="Disabled"; S="Available"},
+    @{Name="PS Logging";       Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";                                         Key="EnableScriptBlockLogging"; W="Disabled"; S="Enabled"},
+    @{Name="Activities Cache"; Path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\System";                                                                Key="EnableActivityFeed";       W="Disabled"; S="Enabled"},
+    @{Name="Prefetch";         Path="HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters"; Key="EnablePrefetcher"; W="Disabled"; S="Enabled"}
 )
 foreach ($r in $regs) {
     $val = Get-ItemProperty -Path $r.Path -Name $r.Key -ErrorAction SilentlyContinue
@@ -132,10 +130,10 @@ function Check-EVMulti { param($log,$ids,$msg)
     if ($e) { Write-Host "  $msg (ID:$($e.Id)) at: " -NoNewline -ForegroundColor White; Write-Host $e.TimeCreated.ToString("MM/dd HH:mm") -ForegroundColor White }
     else { Write-Host "  $msg - No records found" -ForegroundColor Green }
 }
-Check-EV      "Application"  3079         "USN Journal cleared"
-Check-EVMulti "System"       @(104,1102)  "Event Logs cleared"
-Check-EV      "System"       1074         "Last PC Shutdown"
-Check-EV      "System"       6005         "Event Log Service started"
+Check-EV      "Application" 3079        "USN Journal cleared"
+Check-EVMulti "System"      @(104,1102) "Event Logs cleared"
+Check-EV      "System"      1074        "Last PC Shutdown"
+Check-EV      "System"      6005        "Event Log Service started"
 try {
     $ev = Get-WinEvent -LogName "Microsoft-Windows-Kernel-PnP/Configuration" -FilterXPath "*[System[EventID=400]]" -MaxEvents 1 -ErrorAction SilentlyContinue
     if ($ev) { Write-Host "  Device config changed at: " -NoNewline -ForegroundColor White; Write-Host $ev.TimeCreated.ToString("MM/dd HH:mm") -ForegroundColor White }
@@ -146,7 +144,7 @@ try {
 Write-Pink "`nUSN JOURNAL"
 try {
     $usn = fsutil usn queryjournal C: 2>&1
-    if ($usn -match "Invalid|не удалось") {
+    if ($usn -match "Invalid") {
         Write-Host "  Status       : DISABLED" -ForegroundColor Red
     } elseif ($usn -match "Usn Journal ID") {
         Write-Host "  Status       : Enabled" -ForegroundColor Green
@@ -165,8 +163,7 @@ if (Test-Path $pfPath) {
     $files = Get-ChildItem $pfPath -Filter *.pf -Force -ErrorAction SilentlyContinue
     if (-not $files) { Write-Host "  No prefetch files found" -ForegroundColor White }
     else {
-        $total = $files.Count; $ht = @{}; $sus = @{}
-        $hid = @(); $ro = @(); $hidro = @()
+        $total = $files.Count; $ht = @{}; $sus = @{}; $hid = @(); $ro = @(); $hidro = @()
         foreach ($f in $files) {
             try {
                 $isH = $f.Attributes -band [System.IO.FileAttributes]::Hidden
@@ -188,10 +185,15 @@ if (Test-Path $pfPath) {
         else { Write-Host "  ReadOnly Files: None" -ForegroundColor Green }
         $dupes = $ht.GetEnumerator() | Where-Object { $_.Value.Count -gt 1 }
         if ($dupes) {
-            foreach ($e in $dupes) { $e.Value | ForEach-Object { if (-not $sus.ContainsKey($_)) { $sus[$_] = "Duplicate" } }; Write-Host "  Duplicate: $($e.Value -join ', ')" -ForegroundColor White }
+            foreach ($e in $dupes) {
+                $e.Value | ForEach-Object { if (-not $sus.ContainsKey($_)) { $sus[$_] = "Duplicate" } }
+                Write-Host "  Duplicate: $($e.Value -join ', ')" -ForegroundColor White
+            }
         } else { Write-Host "  Duplicates: None" -ForegroundColor Green }
-        if ($sus.Count -gt 0) { Write-Host "`n  SUSPICIOUS: $($sus.Count)/$total" -ForegroundColor White; foreach ($e in $sus.GetEnumerator() | Sort-Object Key) { Write-Host "    $($e.Key) : $($e.Value)" -ForegroundColor White } }
-        else { Write-Host "`n  Prefetch integrity: Clean ($total files)" -ForegroundColor Green }
+        if ($sus.Count -gt 0) {
+            Write-Host "`n  SUSPICIOUS: $($sus.Count)/$total" -ForegroundColor White
+            foreach ($e in $sus.GetEnumerator() | Sort-Object Key) { Write-Host "    $($e.Key) : $($e.Value)" -ForegroundColor White }
+        } else { Write-Host "`n  Prefetch integrity: Clean ($total files)" -ForegroundColor Green }
     }
 } else { Write-Host "`nPREFETCH folder not found" -ForegroundColor Red }
 
@@ -206,7 +208,11 @@ try {
         foreach ($uf in $ufs) {
             if ($uf.LastWriteTime -gt $lat) { $lat = $uf.LastWriteTime }
             $ui = Get-ChildItem -LiteralPath $uf.FullName -File -Force -ErrorAction SilentlyContinue
-            if ($ui) { $all += $ui; $lf = $ui | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($lf -and $lf.LastWriteTime -gt $lat) { $lat = $lf.LastWriteTime } }
+            if ($ui) {
+                $all += $ui
+                $lf = $ui | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($lf -and $lf.LastWriteTime -gt $lat) { $lat = $lf.LastWriteTime }
+            }
         }
         Write-Host "  Last Modified: $($lat.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor White
         if ($all.Count -gt 0) {
@@ -225,28 +231,29 @@ if (Test-Path $hPath) {
     Write-Host "  Last Modified : $($hf.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor White
     Write-Host "  File Size     : $([math]::Round($hf.Length/1024,2)) KB" -ForegroundColor White
     $a = $hf.Attributes
-    if ($a -ne "Archive") { Write-Host "  Attributes    : $a" -ForegroundColor White } else { Write-Host "  Attributes    : Normal" -ForegroundColor Green }
+    if ($a -ne "Archive") { Write-Host "  Attributes    : $a" -ForegroundColor White }
+    else { Write-Host "  Attributes    : Normal" -ForegroundColor Green }
 } else { Write-Host "  History file not found" -ForegroundColor White }
 
 # HOTSPOT / FAKER DETECTION
 Write-Pink "`nHOTSPOT / FAKER DETECTION"
 $suspAct = @(); $fakerDetected = $false; $fakerIndicators = @(); $networkProfiles = @()
 try {
-    $profileOutput = netsh wlan show profiles
-    $profileNames = $profileOutput | Select-String "All User Profile\s+:\s+(.+)" | ForEach-Object { $_.Matches.Groups[1].Value.Trim() }
-    foreach ($pn in $profileNames) {
-        if ([string]::IsNullOrWhiteSpace($pn)) { continue }
-        $isHs = $pn -match "Android|iPhone|iPad|Galaxy|Pixel|OnePlus|Xiaomi|DIRECT-|SM-|GT-"
-        $networkProfiles += [PSCustomObject]@{ SSID=$pn; IsHotspot=$isHs }
+    $po = netsh wlan show profiles
+    $pn = $po | Select-String "All User Profile\s+:\s+(.+)" | ForEach-Object { $_.Matches.Groups[1].Value.Trim() }
+    foreach ($p in $pn) {
+        if ([string]::IsNullOrWhiteSpace($p)) { continue }
+        $isHs = $p -match "Android|iPhone|iPad|Galaxy|Pixel|OnePlus|Xiaomi|DIRECT-|SM-|GT-"
+        $networkProfiles += [PSCustomObject]@{ SSID=$p; IsHotspot=$isHs }
     }
     $hsp = $networkProfiles | Where-Object { $_.IsHotspot }
-    if ($hsp.Count -gt 0) { Write-Host "  Hotspot profiles: $($hsp.Count)" -ForegroundColor White; foreach ($hp in $hsp) { Write-Host "    - $($hp.SSID)" -ForegroundColor White } }
+    if ($hsp.Count -gt 0) { Write-Host "  Hotspot profiles: $($hsp.Count)" -ForegroundColor White; $hsp | ForEach-Object { Write-Host "    - $($_.SSID)" -ForegroundColor White } }
     else { Write-Host "  WiFi profiles: no mobile hotspots" -ForegroundColor Green }
 } catch {}
 
 try {
-    $iface = netsh wlan show interfaces
-    $ssidM = $iface | Select-String "^\s+SSID\s+:\s+(.+)$"
+    $iface  = netsh wlan show interfaces
+    $ssidM  = $iface | Select-String "^\s+SSID\s+:\s+(.+)$"
     $stateM = $iface | Select-String "^\s+State\s+:\s+(.+)$"
     $bssidM = $iface | Select-String "^\s+BSSID\s+:\s+(.+)$"
     $chanM  = $iface | Select-String "^\s+Channel\s+:\s+(.+)$"
@@ -272,17 +279,17 @@ try {
             } catch {}
             Write-Host "  Connected to: $curSSID" -ForegroundColor $(if ($isHs) { "Red" } else { "Green" })
             Write-Host "    BSSID: $bssid | Channel: $chan | Signal: $sig" -ForegroundColor Gray
-            if ($isHs) { Write-Host "  WARNING: HOTSPOT DETECTED!" -ForegroundColor Red; foreach ($i in $hsInd) { Write-Host "    - $i" -ForegroundColor White }; $suspAct+="Connected to hotspot: $curSSID" }
+            if ($isHs) { Write-Host "  WARNING: HOTSPOT DETECTED!" -ForegroundColor Red; $hsInd | ForEach-Object { Write-Host "    - $_" -ForegroundColor White }; $suspAct+="Connected to hotspot: $curSSID" }
         }
     }
 } catch {}
 
 try {
-    $hn = netsh wlan show hostednetwork
+    $hn   = netsh wlan show hostednetwork
     $hnSt = $hn | Select-String "Status\s+:\s+(.+)"
     if ($hnSt -and $hnSt.Matches.Groups[1].Value.Trim() -eq "Started") {
-        $hnSSIDM = $hn | Select-String 'SSID name\s+:\s+"(.+)"'
-        $hnSSID = if ($hnSSIDM) { $hnSSIDM.Matches.Groups[1].Value } else { "Unknown" }
+        $hnSM = $hn | Select-String 'SSID name\s+:\s+"(.+)"'
+        $hnSSID = if ($hnSM) { $hnSM.Matches.Groups[1].Value } else { "Unknown" }
         Write-Host "  WARNING: Hosted Network ACTIVE! SSID: $hnSSID" -ForegroundColor Red
         $suspAct += "Hosted network active: $hnSSID"
     } else { Write-Host "  Hosted Network: Inactive" -ForegroundColor Green }
@@ -296,7 +303,7 @@ if ($ics) {
 
 try {
     $va = Get-WmiObject Win32_NetworkAdapter | Where-Object { $_.NetEnabled -eq $true -and $_.Description -match "Virtual|Hosted|Wi-Fi Direct|TAP" }
-    if ($va) { foreach ($v in $va) { Write-Host "  Virtual adapter: $($v.Description)" -ForegroundColor White }; $suspAct+="$($va.Count) virtual adapter(s)" }
+    if ($va) { $va | ForEach-Object { Write-Host "  Virtual adapter: $($_.Description)" -ForegroundColor White }; $suspAct+="$($va.Count) virtual adapter(s)" }
     else { Write-Host "  Virtual adapters: None" -ForegroundColor Green }
 } catch {}
 
@@ -324,12 +331,15 @@ else {
         Write-Host ("  PID {0} | Started: {1}" -f $jp.Id, $jp.StartTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
         try {
             $cl = (Get-WmiObject Win32_Process -Filter "ProcessId=$($jp.Id)").CommandLine
-            if ($cl) { $s = if ($cl.Length -gt 120) { $cl.Substring(0,117)+"..." } else { $cl }; Write-Host "    CMD: $s" -ForegroundColor Gray }
+            if ($cl) {
+                $sh = if ($cl.Length -gt 120) { $cl.Substring(0,117)+"..." } else { $cl }
+                Write-Host "    CMD: $sh" -ForegroundColor Gray
+            }
         } catch {}
         $pp = $nsLines | Where-Object { $_ -match "\s+$($jp.Id)\s*$" }
         if ($pp) {
             Write-Host "    Ports:" -ForegroundColor White
-            foreach ($ln in $pp) { $l=$ln.Line.Trim(); $c=if ($l -match ":25565") {"Red"} else {"White"}; Write-Host "      $l" -ForegroundColor $c }
+            $pp | ForEach-Object { $l=$_.Line.Trim(); $c=if ($l -match ":25565") {"Red"} else {"White"}; Write-Host "      $l" -ForegroundColor $c }
         } else { Write-Host "    Ports: none found" -ForegroundColor Gray }
     }
 }
@@ -347,8 +357,8 @@ Write-Host "============================================================" -Foreg
 Write-Host "  Suspicious activities : $($suspAct.Count)" -ForegroundColor $(if ($suspAct.Count -gt 0) {"Red"} else {"Green"})
 Write-Host "  Faker detected        : $(if ($fakerDetected) {'YES'} else {'No'})" -ForegroundColor $(if ($fakerDetected) {"Red"} else {"Green"})
 Write-Host "  Hotspot profiles      : $(($networkProfiles | Where-Object {$_.IsHotspot}).Count)" -ForegroundColor White
-if ($suspAct.Count -gt 0) { Write-Host "`n  Warnings:" -ForegroundColor Red; foreach ($a in $suspAct) { Write-Host "    - $a" -ForegroundColor White } }
-if ($fakerIndicators.Count -gt 0) { Write-Host "`n  Faker indicators:" -ForegroundColor Red; foreach ($fi in $fakerIndicators) { Write-Host "    - $fi" -ForegroundColor White } }
+if ($suspAct.Count -gt 0) { Write-Host "`n  Warnings:" -ForegroundColor Red; $suspAct | ForEach-Object { Write-Host "    - $_" -ForegroundColor White } }
+if ($fakerIndicators.Count -gt 0) { Write-Host "`n  Faker indicators:" -ForegroundColor Red; $fakerIndicators | ForEach-Object { Write-Host "    - $_" -ForegroundColor White } }
 
 Write-Host "`nCheck complete. @sweetvata" -ForegroundColor DarkGray
 Write-Host ""
